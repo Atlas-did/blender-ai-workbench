@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Blender addon storage (generated at runtime)
+aiwork/sessions.json
+aiwork/settings.json
+aiwork/audit.jsonl
+AIWork-debug-summary.md
+
+# API Keys / Environment
+*.env
+!1.0.env.example
+
+# OS
+Thumbs.db
+.DS_Store
