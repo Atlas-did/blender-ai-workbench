@@ -85,6 +85,31 @@ def set_last_error(err: str) -> None:
     _state.last_error = err
 
 
+def add_recent_event(event_text: str, *, limit: int = 30) -> None:
+    """记录一条最近操作事件，用于自动上下文同步。"""
+    text = event_text.strip()
+    if not text:
+        return
+    _state.recent_events.append(text)
+    if len(_state.recent_events) > limit:
+        _state.recent_events[:] = _state.recent_events[-limit:]
+
+
+def get_recent_events(limit: int = 30) -> list[str]:
+    """返回最近操作事件。"""
+    if limit <= 0:
+        return []
+    return _state.recent_events[-limit:]
+
+
+def set_last_context_signature(signature: str) -> None:
+    _state.last_context_signature = signature
+
+
+def get_last_context_signature() -> str:
+    return _state.last_context_signature
+
+
 def add_pending_tool_call(tc: ToolCall) -> None:
     _state.pending_tool_calls.append(tc)
 

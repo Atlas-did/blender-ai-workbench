@@ -78,6 +78,10 @@ def collect_scene_context(
     ctx.frame_start = scene.frame_start
     ctx.frame_end = scene.frame_end
 
+    # -- 活动对象 --
+    if context.active_object is not None:
+        ctx.active_object_name = context.active_object.name
+
     # -- 渲染 --
     if include_render:
         ctx.render_engine = scene.render.engine

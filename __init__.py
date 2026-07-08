@@ -125,7 +125,7 @@ _safe_import(f"{__package__}.operators.op_open_file")
 _safe_import(f"{__package__}.operators.op_update")
 _safe_import(f"{__package__}.operators.op_mcp")
 
-# 12. Services（骨架）
+# 12. Services
 _safe_import(f"{__package__}.services.service_bridge")
 _safe_import(f"{__package__}.services.service_worker")
 _safe_import(f"{__package__}.services.service_events")
@@ -264,6 +264,14 @@ def register() -> None:
         except Exception:
             log.error("MCP 服务器自动启动失败:\n%s", traceback.format_exc())
 
+    # 6. 注册 Blender 事件监听（自动上下文同步）
+    if m := _mod("services.service_events"):
+        try:
+            m.register()
+            log.info("事件监听已启动 — AI 可实时感知 Blender 变化")
+        except Exception:
+            log.error("事件监听注册失败:\n%s", traceback.format_exc())
+
     log.info(
         "AIWork 插件已启动 — %d 个类, %d 个工具",
         len(_registerable_classes), tool_count,
@@ -275,7 +283,15 @@ def unregister() -> None:
     """插件注销入口。"""
     log.info("AIWork 插件正在关闭…")
 
-    # 0. 停止 MCP 服务器
+    # 0. 注销 Blender 事件监听
+    try:
+        m = _mod("services.service_events")
+        if m:
+            m.unregister()
+    except Exception:
+        pass
+
+    # 0.5. 停止 MCP 服务器
     try:
         srv_m = _mod("mcp_server")
         if srv_m:

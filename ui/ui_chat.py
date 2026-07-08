@@ -218,6 +218,9 @@ def draw_chat_panel(
         stat.label(text=f"消息 {len(session.messages) if session else 0}", icon=uc.icon("chat"))
         stat.label(text=f"待确认 {len(state.get_state().pending_tool_calls)}", icon=uc.icon("pending"))
         stat.label(text=f"处理中 {'是' if state.is_processing() else '否'}", icon=uc.icon("running"))
+        events_count = len(state.get_recent_events())
+        if events_count > 0:
+            stat.label(text=f"监控 ✓ ({events_count})", icon=uc.icon("done"))
 
         actions = header.row(align=True)
         actions.scale_y = 1.05

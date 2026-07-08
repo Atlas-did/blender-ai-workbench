@@ -71,6 +71,7 @@ class SceneContext:
     """当前场景的上下文快照。"""
     scene_name: str = ""
     object_count: int = 0
+    active_object_name: str = ""
     selected_objects: list[SceneObjectInfo] = field(default_factory=list)
     visible_objects: list[SceneObjectInfo] = field(default_factory=list)
     current_frame: int = 1
@@ -101,11 +102,18 @@ class ContextSnapshot:
         """把上下文序列化为 AI 可读的文本块。"""
         parts = ["[Blender 上下文]"]
         parts.append(f"场景: {self.scene.scene_name}")
+        if self.scene.active_object_name:
+            parts.append(f"活动对象: {self.scene.active_object_name}")
         parts.append(f"文件: {self.project.blend_filename or '(未保存)'}")
         parts.append(f"选中对象 ({len(self.scene.selected_objects)}):")
         for obj in self.scene.selected_objects:
             parts.append(f"  - {obj.name} ({obj.type}) @ {obj.location}")
         parts.append(f"当前帧: {self.scene.current_frame} / {self.scene.frame_start}-{self.scene.frame_end}")
+        recent_events = self.custom.get("recent_events") or []
+        if recent_events:
+            parts.append("最近操作:")
+            for event in recent_events[-8:]:
+                parts.append(f"  - {event}")
         return "\n".join(parts)
 
 
@@ -186,3 +194,5 @@ class RuntimeState:
     last_error: str = ""
     pending_tool_calls: list[ToolCall] = field(default_factory=list)
     tool_chain_depth: int = 0
+    recent_events: list[str] = field(default_factory=list)
+    last_context_signature: str = ""

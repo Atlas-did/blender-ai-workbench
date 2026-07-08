@@ -120,6 +120,15 @@ def _execute(tc: ToolCall) -> ToolCall:
         )
         session.add_message(msg)
 
+    # 工具执行后强制刷新上下文，确保后续对话能反映最新状态
+    try:
+        from .context_builder import collect_context
+        snapshot = collect_context(bpy.context)
+        if session:
+            session.context_snapshot = snapshot
+    except Exception:
+        pass
+
     return tc
 
 
