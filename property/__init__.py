@@ -32,7 +32,7 @@ _provider_enum_items: list[tuple[str, str, str]] = []
 def _refresh_provider_enum() -> None:
     global _provider_enum_items
     _provider_enum_items.clear()
-    from .providers.registry import list_provider_ids
+    from ..providers.registry import list_provider_ids
     for pid in list_provider_ids():
         _provider_enum_items.append((pid, pid, ""))
 
@@ -53,7 +53,7 @@ def _model_items(self, context):
     if not provider_id:
         return [("", "请先选择 Provider", "")]
     try:
-        from .providers.registry import get_provider
+        from ..providers.registry import get_provider
         provider = get_provider(provider_id)
         models = provider.list_models()
         return [(m, m, "") for m in models]
