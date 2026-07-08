@@ -60,27 +60,27 @@ def _tool_needs_confirmation(tool_name: str) -> bool:
 # 辅助：继续对话（工具执行后把结果发回 AI）
 # ---------------------------------------------------------------------------
 
-def _continue_conversation(prefs, placeholder: Message) -> None:
+def _continue_conversation(prefs, old_placeholder: Message) -> None:
     """工具执行完毕后，把结果发回 AI 获取最终回复。"""
-    # 检查工具链深度
     current_depth = state.get_state().tool_chain_depth
     if current_depth >= MAX_TOOL_CHAIN_DEPTH:
         log.warning("工具链深度已达上限 %d，停止继续", MAX_TOOL_CHAIN_DEPTH)
         state.set_processing(False)
-        placeholder.content += "\n\n⚠ 工具链深度已达上限，请手动继续对话。"
+        old_placeholder.content += "\n\n⚠ 工具链深度已达上限，请手动继续对话。"
         _tag_redraw()
         return
 
     state.get_state().tool_chain_depth = current_depth + 1
 
-    # 构建消息（包含工具调用结果）
-    api_messages = _build_messages_with_tool_results(prefs)
+    # ★ 关键修复：创建全新的 placeholder，避免旧 tool_calls 污染
+    new_placeholder = Message(role=Role.ASSISTANT, content="")
+    state.add_message(new_placeholder)
+    AIWORK_OT_ChatSend._stream_msg = new_placeholder
 
-    # 工具定义
+    api_messages = _build_messages_with_tool_results(prefs)
     tool_defs = get_all_definitions()
     api_tools = [tool_def_to_api(td) for td in tool_defs] if tool_defs else None
 
-    # 后台线程发起后续 API 请求
     def _call_followup() -> None:
         try:
             chat_completion_stream(
@@ -93,8 +93,8 @@ def _continue_conversation(prefs, placeholder: Message) -> None:
                 tools=api_tools,
                 timeout=prefs.request_timeout,
                 on_token=lambda token: _stream_queue.put({"type": "token", "data": token}),
-                on_tool_call=lambda name, args: _stream_queue.put(
-                    {"type": "tool_call", "data": {"name": name, "arguments": args}}
+                on_tool_call=lambda tc_id, name, args: _stream_queue.put(
+                    {"type": "tool_call", "data": {"id": tc_id, "name": name, "arguments": args}}
                 ),
                 on_done=lambda content, tcs, usage: _stream_queue.put(
                     {"type": "done", "data": {"content": content, "tool_calls": tcs, "usage": usage}}
