@@ -135,6 +135,23 @@ def draw_input_area(layout: bpy.types.UILayout, context: bpy.types.Context) -> N
     # 附件列表（chip 样式）
     attachments = state.get_state().attachments
     if attachments:
+        # Vision 兼容性检查
+        has_images = any(a.get("is_image") for a in attachments)
+        if has_images:
+            try:
+                from ..providers.registry import get_provider
+                props = context.scene.aiwork_property
+                provider = get_provider(props.api_provider or "moonshot")
+                if not provider.supports_vision(props.model_name or provider.get_default_model()):
+                    warn = box.box()
+                    warn.alert = True
+                    warn.label(
+                        text="⚠ 当前模型不支持识图！请切换到 moonshot-v1-32k-vision 或 gpt-4o",
+                        icon="ERROR",
+                    )
+            except Exception:
+                pass
+
         att_box = box.box()
         att_row = att_box.row(align=True)
         att_row.label(text="📎 附件", icon="FILE")

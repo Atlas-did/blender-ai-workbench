@@ -98,6 +98,10 @@ class BaseProvider:
     # 校验
     # ------------------------------------------------------------------
 
+    def supports_vision(self, model: str) -> bool:
+        """检查模型是否支持 Vision（图片输入）。"""
+        return False  # 默认不支持
+
     def validate_api_key(self, api_key: str) -> bool:
         """校验 API Key 格式。"""
         return len(api_key) > 0

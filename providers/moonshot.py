@@ -18,13 +18,26 @@ class MoonshotProvider(BaseProvider):
         default_api_key_env="MOONSHOT_API_KEY",
     )
 
+    # 支持 Vision 的模型
+    VISION_MODELS = {
+        "moonshot-v1-32k-vision",
+        "moonshot-v1-128k-vision",
+        "kimi-latest",
+    }
+
     def list_models(self) -> list[str]:
         return [
             "moonshot-v1-auto",
             "moonshot-v1-8k",
             "moonshot-v1-32k",
             "moonshot-v1-128k",
+            "moonshot-v1-32k-vision",   # 支持识图
+            "moonshot-v1-128k-vision",  # 支持识图
         ]
+
+    def supports_vision(self, model: str) -> bool:
+        """检查模型是否支持 Vision API。"""
+        return model in self.VISION_MODELS
 
     def build_request(self, messages, model, *, max_tokens=4096, temperature=0.7, tools=None, stream=True):
         url = self.info.default_endpoint.rstrip("/") + "/chat/completions"

@@ -19,7 +19,7 @@ DEFAULT_API_ENDPOINT = "https://api.moonshot.cn/v1"
 DEFAULT_API_KEY = ""  # 在 Blender 偏好设置中填入你的 API Key
 DEFAULT_MODEL_NAME = "moonshot-v1-auto"  # 自动选择最优模型，131K 上下文
 DEFAULT_MAX_TOKENS = 4096
-DEFAULT_TEMPERATURE = 0.7
+DEFAULT_TEMPERATURE = 1.0  # Kimi 等模型要求 temperature=1
 DEFAULT_REQUEST_TIMEOUT = 120  # 秒，Kimi 有时响应较慢
 
 # ---------------------------------------------------------------------------

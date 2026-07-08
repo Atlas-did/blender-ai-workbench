@@ -134,7 +134,7 @@ class AIWorkSceneProperty(bpy.types.PropertyGroup):
 
     temperature: FloatProperty(
         name="Temperature",
-        default=0.7, min=0.0, max=2.0, step=0.05,
+        default=1.0, min=0.0, max=2.0, step=0.05,
     )
 
     request_timeout: IntProperty(

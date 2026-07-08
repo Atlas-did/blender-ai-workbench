@@ -25,3 +25,7 @@ class OpenAIProvider(MoonshotProvider):
             "gpt-4-turbo",
             "o4-mini",
         ]
+
+    def supports_vision(self, model: str) -> bool:
+        # GPT-4o 系列都支持 vision（o 系列推理模型除外）
+        return not model.startswith("o")
