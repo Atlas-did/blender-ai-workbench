@@ -173,6 +173,18 @@ class AIWorkSceneProperty(bpy.types.PropertyGroup):
     # -- 开发者 --
     use_dev_ui: BoolProperty(name="开发者 UI", default=False)
 
+    # -- Tab 切换 --
+    active_tab: EnumProperty(
+        name="标签",
+        items=[
+            ('CHAT', "对话", "AI 对话界面"),
+            ('CONTEXT', "上下文", "场景详情与事件监控"),
+            ('HISTORY', "历史", "会话历史"),
+            ('SETTINGS', "设置", "API、MCP、采集参数"),
+        ],
+        default='CHAT',
+    )
+
     # -- 最近事件（只读展示） --
     recent_events_text: StringProperty(
         name="最近事件",
