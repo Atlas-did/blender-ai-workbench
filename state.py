@@ -116,3 +116,11 @@ def add_pending_tool_call(tc: ToolCall) -> None:
 
 def clear_pending_tools() -> None:
     _state.pending_tool_calls.clear()
+
+
+def add_attachment(att: dict) -> None:
+    _state.attachments.append(att)
+
+
+def clear_attachments() -> None:
+    _state.attachments.clear()

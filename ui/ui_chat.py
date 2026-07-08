@@ -128,16 +128,25 @@ def draw_pending_tools(layout: bpy.types.UILayout) -> None:
 # ---------------------------------------------------------------------------
 
 def draw_input_area(layout: bpy.types.UILayout, context: bpy.types.Context) -> None:
-    """绘制底部输入区域：输入框 + 发送/清空按钮。"""
+    """绘制底部输入区域：附件 + 输入框 + 发送/清空按钮。"""
     box = layout.box()
     box.scale_y = 1.0
 
-    header = box.row(align=True)
-    header.label(text="快速输入", icon=uc.icon("chat"))
-    header.separator_spacer()
-    header.label(text="按 Enter 直接发送，Shift+Enter 换行", icon="INFO")
+    # 附件列表（chip 样式）
+    attachments = state.get_state().attachments
+    if attachments:
+        att_box = box.box()
+        att_row = att_box.row(align=True)
+        att_row.label(text="📎 附件", icon="FILE")
+        att_row.operator("aiwork.clear_attachments", text="清空全部", icon="X")
+        for i, att in enumerate(attachments):
+            row = att_box.row(align=True)
+            icon = "IMAGE_DATA" if att.get("is_image") else "TEXT"
+            row.label(text=f"  {att['filename']}", icon=icon)
+            op = row.operator("aiwork.remove_attachment", text="", icon="X", emboss=False)
+            op.index = i
 
-    # 输入框（多行近似——Blender 单行 Text 属性）
+    # 输入框
     row = box.row(align=True)
     row.scale_y = 1.15
     row.prop(
@@ -145,13 +154,15 @@ def draw_input_area(layout: bpy.types.UILayout, context: bpy.types.Context) -> N
         INPUT_PROP_NAME,
         text="",
         icon=uc.icon("chat"),
-        placeholder="输入你的问题…例如：帮我把选中的立方体旋转 45 度",
+        placeholder="输入你的问题…（可附加图片/文件）",
     )
 
     # 按钮行
     btn_row = box.row(align=True)
     is_busy = state.is_processing()
 
+    # 附件按钮
+    btn_row.operator("aiwork.attach_file", text="", icon="FILE_IMAGE")
     btn_row.operator(
         "aiwork.chat_send",
         text="发送" if not is_busy else "处理中…",

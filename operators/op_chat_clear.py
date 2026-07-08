@@ -21,6 +21,7 @@ class AIWORK_OT_ChatClear(Operator):
     def execute(self, context: bpy.types.Context) -> set[str]:
         state.reset_state()
         state.new_session()
+        state.clear_attachments()
         self.report({'INFO'}, "会话已清空，开始新对话")
         return {'FINISHED'}
 

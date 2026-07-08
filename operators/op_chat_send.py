@@ -232,6 +232,8 @@ class AIWORK_OT_ChatSend(Operator):
 
         # 9. 启动 Blender timer 轮询结果
         bpy.app.timers.register(self._poll_stream, first_interval=0.1)
+        # 10. 发送后清空附件
+        state.clear_attachments()
         log.info("用户消息已发送: %s…", text[:80])
         return {'FINISHED'}
 
@@ -378,16 +380,56 @@ class AIWORK_OT_ChatRetry(Operator):
 # 辅助
 # ---------------------------------------------------------------------------
 
+def _is_last_user_message(messages: list, index: int) -> bool:
+    """检查 index 位置的 USER 消息是否是消息列表中的最后一条用户消息。"""
+    for j in range(index + 1, len(messages)):
+        if messages[j].role == Role.USER:
+            return False
+    return True
+
+
 def _session_messages_to_dicts() -> list[dict]:
-    """把当前会话消息转为 API 格式的 dict 列表。"""
+    """把当前会话消息转为 API 格式的 dict 列表（含附件）。"""
     session = state.get_current_session()
     if session is None:
         return []
 
+    attachments = state.get_state().attachments
+
     result: list[dict] = []
-    for msg in session.messages:
+    for i, msg in enumerate(session.messages):
         if msg.role == Role.USER:
-            result.append({"role": "user", "content": msg.content})
+            # 检查是否是最后一条用户消息 + 有附件
+            is_last_user = _is_last_user_message(session.messages, i)
+            image_atts = [a for a in attachments if a.get("is_image")] if is_last_user else []
+            text_atts = [a for a in attachments if not a.get("is_image")] if is_last_user else []
+
+            if image_atts or text_atts:
+                # 构建 Vision API 多部分 content
+                content_parts: list[dict] = []
+
+                # 文本内容
+                text_content = msg.content
+                if text_atts:
+                    text_content += "\n\n[附加文件内容]\n"
+                    for ta in text_atts:
+                        text_content += f"\n--- {ta['filename']} ---\n{ta.get('content', '')}\n"
+                content_parts.append({"type": "text", "text": text_content})
+
+                # 图片内容
+                for ia in image_atts:
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{ia['mime_type']};base64,{ia['base64']}",
+                            "detail": "auto",
+                        },
+                    })
+
+                result.append({"role": "user", "content": content_parts})
+            else:
+                result.append({"role": "user", "content": msg.content})
+
         elif msg.role == Role.ASSISTANT:
             entry: dict = {"role": "assistant", "content": msg.content}
             if msg.tool_calls:

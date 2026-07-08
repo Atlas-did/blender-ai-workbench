@@ -196,3 +196,4 @@ class RuntimeState:
     tool_chain_depth: int = 0
     recent_events: list[str] = field(default_factory=list)
     last_context_signature: str = ""
+    attachments: list[dict] = field(default_factory=list)  # 用户附加的文件

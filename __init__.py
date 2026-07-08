@@ -50,6 +50,7 @@ _submodules = [
     "operators.op_refresh_context", "operators.op_tool_confirm",
     "operators.op_tool_execute", "operators.op_open_file",
     "operators.op_update", "operators.op_mcp", "operators.op_session",
+    "operators.op_attach_file",
     "services.service_bridge", "services.service_worker",
     "services.service_events", "services.service_stream",
 ]
@@ -120,6 +121,10 @@ def _collect_classes():
     if m := _mod("operators.op_session"):
         _registerable_classes.append(m.AIWORK_OT_SwitchSession)
         _registerable_classes.append(m.AIWORK_OT_DeleteSession)
+    if m := _mod("operators.op_attach_file"):
+        _registerable_classes.append(m.AIWORK_OT_AttachFile)
+        _registerable_classes.append(m.AIWORK_OT_RemoveAttachment)
+        _registerable_classes.append(m.AIWORK_OT_ClearAttachments)
 
 
 # ---------------------------------------------------------------------------
