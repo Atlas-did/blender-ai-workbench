@@ -27,6 +27,8 @@ _REFRESH_PENDING = False
 _REFRESH_TIMER_ACTIVE = False
 _PENDING_REASONS: list[str] = []
 _DEBOUNCE_SECONDS = 0.25
+_COOLDOWN_SECONDS = 0.5  # 两次刷新之间的最小间隔
+_last_refresh_time = 0.0
 
 
 def register() -> None:
@@ -70,6 +72,8 @@ def unregister() -> None:
 
 def request_context_refresh(reason: str = "scene changed") -> None:
 	"""请求一次上下文刷新（会去抖合并多次事件）。"""
+	if state.get_current_session() is None:
+		return
 	global _REFRESH_PENDING
 	_PENDING_REASONS.append(reason)
 	_REFRESH_PENDING = True
@@ -85,13 +89,25 @@ def _ensure_refresh_timer() -> None:
 
 
 def _flush_pending_refresh() -> float | None:
-	global _REFRESH_PENDING, _REFRESH_TIMER_ACTIVE
+	global _REFRESH_PENDING, _REFRESH_TIMER_ACTIVE, _last_refresh_time
 	_REFRESH_TIMER_ACTIVE = False
 
 	if not _REFRESH_PENDING:
 		return None
 
+	# AI 处理中不刷新（工具执行会导致大量 depsgraph 事件）
+	if state.is_processing():
+		_REFRESH_PENDING = False
+		return None
+
+	# 冷却时间：距上次刷新不足 _COOLDOWN_SECONDS 就跳过
+	import time
+	now = time.time()
+	if now - _last_refresh_time < _COOLDOWN_SECONDS:
+		return None
+
 	_REFRESH_PENDING = False
+	_last_refresh_time = now
 	reasons = _drain_reasons()
 
 	try:

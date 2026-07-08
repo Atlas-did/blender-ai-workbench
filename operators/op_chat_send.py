@@ -431,7 +431,11 @@ def _session_messages_to_dicts() -> list[dict]:
                 result.append({"role": "user", "content": msg.content})
 
         elif msg.role == Role.ASSISTANT:
-            entry: dict = {"role": "assistant", "content": msg.content}
+            # 跳过完全空的 assistant 消息（无内容且无工具调用）
+            if not msg.content and not msg.tool_calls:
+                continue
+            # 空内容但有 tool_calls 时用 null（API 兼容）
+            entry: dict = {"role": "assistant", "content": msg.content or None}
             if msg.tool_calls:
                 entry["tool_calls"] = [
                     {
