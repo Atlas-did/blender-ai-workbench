@@ -218,8 +218,8 @@ class AIWORK_OT_ChatSend(Operator):
                     tools=api_tools,
                     timeout=prefs.request_timeout,
                     on_token=lambda token: _stream_queue.put({"type": "token", "data": token}),
-                    on_tool_call=lambda name, args: _stream_queue.put(
-                        {"type": "tool_call", "data": {"name": name, "arguments": args}}
+                    on_tool_call=lambda tc_id, name, args: _stream_queue.put(
+                        {"type": "tool_call", "data": {"id": tc_id, "name": name, "arguments": args}}
                     ),
                     on_done=lambda content, tcs, usage: _stream_queue.put(
                         {"type": "done", "data": {"content": content, "tool_calls": tcs, "usage": usage}}
@@ -259,10 +259,12 @@ class AIWORK_OT_ChatSend(Operator):
                 elif item["type"] == "tool_call":
                     tool_name = item["data"]["name"]
                     tool_args = item["data"]["arguments"]
+                    tool_call_id = item["data"].get("id", "")  # API 返回的 tool_call_id
 
                     if _tool_needs_confirmation(tool_name):
                         # MEDIUM/HIGH 风险 → 加入待确认队列
                         tc = ToolCall(
+                            id=tool_call_id or f"tc_{tool_name}",
                             tool_name=tool_name,
                             arguments=tool_args,
                             status=ToolCallStatus.PENDING,
@@ -274,6 +276,18 @@ class AIWORK_OT_ChatSend(Operator):
                     else:
                         # LOW 风险 → 自动执行
                         tc = dispatch_tool_call(tool_name, tool_args, auto_confirm_low_risk=True)
+                        # 使用 API 返回的 tool_call_id，确保后续对话中 ID 匹配
+                        if tool_call_id:
+                            tc.id = tool_call_id
+                            # 同步更新 TOOL 消息中的 tool_call_id
+                            session = state.get_current_session()
+                            if session:
+                                for m in reversed(session.messages):
+                                    if m.role == Role.TOOL:
+                                        for mtc in m.tool_calls:
+                                            if mtc.tool_name == tool_name:
+                                                mtc.id = tool_call_id
+                                        break
                         if msg:
                             msg.tool_calls.append(tc)
                         log.info("工具 '%s' 自动执行完成 (风险: LOW) 结果=%s",

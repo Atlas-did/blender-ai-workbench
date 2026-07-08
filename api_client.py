@@ -209,7 +209,7 @@ def chat_completion_stream(
     tools: list[dict[str, Any]] | None = None,
     timeout: int = 120,
     on_token: Callable[[str], None] | None = None,
-    on_tool_call: Callable[[str, dict], None] | None = None,
+    on_tool_call: Callable[[str, str, dict], None] | None = None,  # (tool_call_id, name, args)
     on_done: Callable[[str, list, dict], None] | None = None,
 ) -> None:
     """流式聊天请求，通过回调函数逐步输出。
@@ -299,10 +299,10 @@ def chat_completion_stream(
         except json.JSONDecodeError:
             log.warning("tool_call arguments JSON 解析失败: %s", buf["arguments_str"][:100])
             args = {}
-        tc = {"name": buf["name"], "arguments": args}
+        tc = {"id": buf.get("id", ""), "name": buf["name"], "arguments": args}
         tool_calls.append(tc)
         if on_tool_call:
-            on_tool_call(buf["name"], args)
+            on_tool_call(buf.get("id", ""), buf["name"], args)
 
     log.info("API 流完成: content=%d chars, tool_calls=%d", len(full_content), len(tool_calls))
 
