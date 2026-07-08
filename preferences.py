@@ -2,7 +2,7 @@
 preferences.py — 插件偏好设置
 ==============================
 Blender 插件偏好设置面板。用户在 Edit → Preferences → Add-ons → AIWork 中配置。
-包含 API 连接、模型参数、MCP 设置、上下文采集选项等。
+包含 API 连接、MCP 服务器、模型参数、上下文采集选项等。
 """
 
 from __future__ import annotations
@@ -85,18 +85,32 @@ class AIWorkPreferences(AddonPreferences):
     )
 
     # ------------------------------------------------------------------
-    # MCP 设置
+    # MCP 服务器设置
     # ------------------------------------------------------------------
     mcp_enabled: BoolProperty(
-        name="启用 MCP",
-        description="是否启用 Model Context Protocol 连接",
+        name="启用 MCP 服务器",
+        description="启动 TCP 服务器，让外部 AI 工具（Claude Code / VS Code）直接调用 Blender 工具",
         default=DEFAULT_MCP_ENABLED,
     )
 
-    mcp_server_address: StringProperty(
-        name="MCP 服务地址",
-        description="MCP 服务端地址",
-        default=DEFAULT_MCP_SERVER_ADDRESS,
+    mcp_host: StringProperty(
+        name="MCP 监听地址",
+        description="MCP 服务器绑定的地址",
+        default="localhost",
+    )
+
+    mcp_port: IntProperty(
+        name="MCP 端口",
+        description="MCP 服务器监听端口",
+        default=9876,
+        min=1024,
+        max=65535,
+    )
+
+    mcp_auto_start: BoolProperty(
+        name="插件加载时自动启动 MCP",
+        description="启用插件时自动启动 MCP 服务器",
+        default=False,
     )
 
     # ------------------------------------------------------------------
@@ -150,7 +164,7 @@ class AIWorkPreferences(AddonPreferences):
 
         # -- API 连接 --
         box = layout.box()
-        box.label(text="API 连接", icon='URL')
+        box.label(text="API 连接（聊天面板）", icon='URL')
         box.prop(self, "api_endpoint")
         box.prop(self, "api_key")
         box.prop(self, "model_name")
@@ -160,12 +174,36 @@ class AIWorkPreferences(AddonPreferences):
         row.prop(self, "temperature")
         box.prop(self, "request_timeout")
 
-        # -- MCP --
+        # -- MCP 服务器 --
         box = layout.box()
-        box.label(text="MCP (Model Context Protocol)", icon='NETWORK_DRIVE')
+        box.label(text="MCP 服务器（外部 AI 接入）", icon='NETWORK_DRIVE')
         box.prop(self, "mcp_enabled")
         if self.mcp_enabled:
-            box.prop(self, "mcp_server_address")
+            row = box.row(align=True)
+            row.prop(self, "mcp_host", text="地址")
+            row.prop(self, "mcp_port", text="端口")
+            box.prop(self, "mcp_auto_start", text="加载插件时自动启动")
+
+            # MCP 状态和操作按钮
+            from .mcp_server import is_running
+            mcp_running = is_running()
+            status_text = "🟢 运行中" if mcp_running else "🔴 已停止"
+            box.label(text=f"MCP 服务器状态: {status_text}")
+
+            row = box.row(align=True)
+            if mcp_running:
+                row.operator("aiwork.mcp_stop", text="停止 MCP 服务器", icon='CANCEL')
+            else:
+                row.operator("aiwork.mcp_start", text="启动 MCP 服务器", icon='PLAY')
+            row.operator("aiwork.mcp_restart", text="重启 MCP 服务器", icon='FILE_REFRESH')
+
+        # -- 会话管理 --
+        box = layout.box()
+        box.label(text="会话管理", icon='FILE_TEXT')
+        row = box.row(align=True)
+        row.operator("aiwork.chat_clear", text="清空当前会话", icon='TRASH')
+        row.operator("aiwork.chat_new_session", text="新建会话", icon='ADD')
+        row.operator("aiwork.refresh_context", text="刷新上下文", icon='FILE_REFRESH')
 
         # -- 上下文 --
         box = layout.box()

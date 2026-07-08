@@ -90,9 +90,10 @@ _safe_import(f"{__package__}.tools_registry")
 # 5. 执行器
 _safe_import(f"{__package__}.executor")
 
-# 6. API / 通信
+# 6. API / MCP 通信
 _safe_import(f"{__package__}.api_client")
 _safe_import(f"{__package__}.mcp_client")
+_safe_import(f"{__package__}.mcp_server")
 
 # 7. 安全 & 审计
 _safe_import(f"{__package__}.security")
@@ -122,6 +123,7 @@ _safe_import(f"{__package__}.operators.op_tool_confirm")
 _safe_import(f"{__package__}.operators.op_tool_execute")
 _safe_import(f"{__package__}.operators.op_open_file")
 _safe_import(f"{__package__}.operators.op_update")
+_safe_import(f"{__package__}.operators.op_mcp")
 
 # 12. Services（骨架）
 _safe_import(f"{__package__}.services.service_bridge")
@@ -200,6 +202,10 @@ def _collect_classes() -> None:
     if m := _mod("operators.op_update"):
         _registerable_classes.append(m.AIWORK_OT_CheckUpdate)
         _registerable_classes.append(m.AIWORK_OT_GitLog)
+    if m := _mod("operators.op_mcp"):
+        _registerable_classes.append(m.AIWORK_OT_MCPStart)
+        _registerable_classes.append(m.AIWORK_OT_MCPStop)
+        _registerable_classes.append(m.AIWORK_OT_MCPRestart)
 
 
 # ---------------------------------------------------------------------------
@@ -246,6 +252,18 @@ def register() -> None:
         except Exception:
             log.error("加载历史会话失败:\n%s", traceback.format_exc())
 
+    # 5. 自动启动 MCP 服务器（如果配置了）
+    if m := _mod("preferences"):
+        try:
+            prefs = m.get_prefs()
+            if prefs.mcp_enabled and prefs.mcp_auto_start:
+                srv_m = _mod("mcp_server")
+                if srv_m:
+                    srv_m.start_server(host=prefs.mcp_host, port=prefs.mcp_port)
+                    log.info("MCP 服务器自动启动")
+        except Exception:
+            log.error("MCP 服务器自动启动失败:\n%s", traceback.format_exc())
+
     log.info(
         "AIWork 插件已启动 — %d 个类, %d 个工具",
         len(_registerable_classes), tool_count,
@@ -256,6 +274,14 @@ def register() -> None:
 def unregister() -> None:
     """插件注销入口。"""
     log.info("AIWork 插件正在关闭…")
+
+    # 0. 停止 MCP 服务器
+    try:
+        srv_m = _mod("mcp_server")
+        if srv_m:
+            srv_m.stop_server()
+    except Exception:
+        pass
 
     # 1. 保存当前会话
     st = _mod("state")
