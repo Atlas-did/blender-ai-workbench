@@ -49,7 +49,7 @@ _submodules = [
     "operators.op_chat_send", "operators.op_chat_clear",
     "operators.op_refresh_context", "operators.op_tool_confirm",
     "operators.op_tool_execute", "operators.op_open_file",
-    "operators.op_update", "operators.op_mcp",
+    "operators.op_update", "operators.op_mcp", "operators.op_session",
     "services.service_bridge", "services.service_worker",
     "services.service_events", "services.service_stream",
 ]
@@ -117,6 +117,9 @@ def _collect_classes():
         _registerable_classes.append(m.AIWORK_OT_MCPStart)
         _registerable_classes.append(m.AIWORK_OT_MCPStop)
         _registerable_classes.append(m.AIWORK_OT_MCPRestart)
+    if m := _mod("operators.op_session"):
+        _registerable_classes.append(m.AIWORK_OT_SwitchSession)
+        _registerable_classes.append(m.AIWORK_OT_DeleteSession)
 
 
 # ---------------------------------------------------------------------------

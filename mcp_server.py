@@ -32,6 +32,7 @@ log = logging.getLogger(__name__)
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 9876
 RECV_BUFFER = 8192
+MAX_BUFFER_SIZE = 1024 * 1024  # 1MB，防止恶意客户端耗尽内存
 SOCKET_TIMEOUT = 1.0
 
 
@@ -128,6 +129,9 @@ class BlenderMCPServer:
                         break
 
                     buffer += data
+                    if len(buffer) > MAX_BUFFER_SIZE:
+                        log.error("MCP buffer 溢出 (%d bytes)，关闭连接", len(buffer))
+                        break
                     try:
                         command = json.loads(buffer.decode("utf-8"))
                         buffer = b""

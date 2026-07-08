@@ -135,7 +135,7 @@ def draw_input_area(layout: bpy.types.UILayout, context: bpy.types.Context) -> N
     header = box.row(align=True)
     header.label(text="快速输入", icon=uc.icon("chat"))
     header.separator_spacer()
-    header.label(text="Shift+Enter 无效，直接发送即可", icon="INFO")
+    header.label(text="按 Enter 直接发送，Shift+Enter 换行", icon="INFO")
 
     # 输入框（多行近似——Blender 单行 Text 属性）
     row = box.row(align=True)
@@ -174,59 +174,203 @@ def draw_chat_panel(
     *,
     show_header: bool = True,
 ) -> None:
-    """绘制聊天面板的全部内容。
+    """绘制聊天面板的全部内容（Tabbed UI）。
 
-    调用顺序：
-    1. 标题栏
-    2. 连接状态
-    3. 上下文摘要
-    4. 消息列表
-    5. 待确认工具
-    6. 输入区域
+    Tab 切换: 对话 | 上下文 | 历史 | 设置
     """
     root = layout.column(align=True)
     root.scale_y = 0.98
 
-    # -- 顶部摘要 / 状态栏 --
+    # 获取当前 tab
+    try:
+        props = context.scene.aiwork_property
+    except AttributeError:
+        props = None
+
+    # -- 顶部标题栏 --
     if show_header:
         header = root.box()
-
         top = header.row(align=True)
         top.label(text="AIWork", icon=uc.icon("ai"))
         top.separator_spacer()
         top.label(text="Blender AI 工作台", icon="INFO")
 
+        # 紧凑状态栏
         cs = state.get_state().connection_state
-        status_text = {
-            "disconnected": "未连接",
-            "connecting": "连接中",
-            "connected": "已连接",
-            "error": "异常",
-        }.get(cs.value, cs.value)
-        status_icon = {
-            "disconnected": uc.icon("cancel"),
-            "connecting": uc.icon("pending"),
-            "connected": uc.icon("done"),
-            "error": uc.icon("error"),
-        }.get(cs.value, "DOT")
+        status_text = {"disconnected": "未连接", "connecting": "连接中",
+                       "connected": "已连接", "error": "异常"}.get(cs.value, cs.value)
+        status_icon = {"disconnected": uc.icon("cancel"), "connecting": uc.icon("pending"),
+                       "connected": uc.icon("done"), "error": uc.icon("error")}.get(cs.value, "DOT")
 
         stat = header.row(align=True)
         stat.label(text=status_text, icon=status_icon)
-        stat.separator_spacer()
-
         session = state.get_current_session()
         stat.label(text=f"消息 {len(session.messages) if session else 0}", icon=uc.icon("chat"))
         stat.label(text=f"待确认 {len(state.get_state().pending_tool_calls)}", icon=uc.icon("pending"))
-        stat.label(text=f"处理中 {'是' if state.is_processing() else '否'}", icon=uc.icon("running"))
         events_count = len(state.get_recent_events())
         if events_count > 0:
             stat.label(text=f"监控 ✓ ({events_count})", icon=uc.icon("done"))
 
-        actions = header.row(align=True)
-        actions.scale_y = 1.05
-        actions.operator("aiwork.refresh_context", text="刷新上下文", icon=uc.icon("refresh"))
-        actions.operator("aiwork.chat_new_session", text="新建会话", icon=uc.icon("chat"))
-        actions.operator("aiwork.chat_clear", text="清空", icon=uc.icon("clear"))
+        # Tab 切换栏
+        if props:
+            tab_row = header.row(align=True)
+            tab_row.scale_y = 1.1
+            tab_row.prop(props, "active_tab", expand=True)
+
+    # 根据 tab 绘制不同内容
+    active_tab = props.active_tab if props else 'CHAT'
+
+    if active_tab == 'CHAT':
+        _draw_chat_tab(root, context)
+    elif active_tab == 'CONTEXT':
+        _draw_context_tab(root, context)
+    elif active_tab == 'HISTORY':
+        _draw_history_tab(root, context)
+    elif active_tab == 'SETTINGS':
+        _draw_settings_tab(root, context)
+
+
+# ---------------------------------------------------------------------------
+# Tab: 💬 对话
+# ---------------------------------------------------------------------------
+
+def _draw_chat_tab(layout: bpy.types.UILayout, context: bpy.types.Context) -> None:
+    """对话 tab：消息流 + 待确认工具 + 输入框。"""
+    # 上下文摘要（可折叠）
+    session = state.get_current_session()
+    if session and session.context_snapshot:
+        snap = session.context_snapshot
+        ctx_box = layout.box()
+        row = ctx_box.row(align=True)
+        row.label(text="📐 上下文", icon=uc.icon("context"))
+        row.operator("aiwork.refresh_context", text="", icon=uc.icon("refresh"))
+        s = snap.scene
+        p = snap.project
+        ctx_box.label(text=f"场景: {s.scene_name or '(未命名)'} | 选中: {len(s.selected_objects)} 个 | 帧: {s.current_frame}")
+        if p.blend_filename:
+            ctx_box.label(text=f"文件: {p.blend_filename}")
+
+    # 消息流
+    messages = state.get_messages()
+    draw_messages(layout, messages)
+
+    # 待确认工具
+    draw_pending_tools(layout)
+
+    # 输入区
+    draw_input_area(layout, context)
+
+
+# ---------------------------------------------------------------------------
+# Tab: 📊 上下文
+# ---------------------------------------------------------------------------
+
+def _draw_context_tab(layout: bpy.types.UILayout, context: bpy.types.Context) -> None:
+    """上下文 tab：场景详情 + 项目详情 + 事件监控。"""
+    from ..context_builder import collect_context
+
+    layout.operator("aiwork.refresh_context", text="🔄 刷新上下文", icon=uc.icon("refresh"))
+
+    session = state.get_current_session()
+    snapshot = session.context_snapshot if session else None
+
+    if snapshot is None:
+        uc.draw_empty_state(layout, "点击上方按钮采集上下文")
+        return
+
+    s = snapshot.scene
+    p = snapshot.project
+
+    # 场景信息
+    box = layout.box()
+    box.label(text="📐 场景", icon="SCENE_DATA")
+    box.label(text=f"名称: {s.scene_name or '(未命名)'}")
+    box.label(text=f"对象数: {s.object_count}")
+    box.label(text=f"当前帧: {s.current_frame}  [{s.frame_start}-{s.frame_end}]")
+    box.label(text=f"渲染引擎: {s.render_engine or '(默认)'}")
+
+    if s.selected_objects:
+        sub = box.box()
+        sub.label(text=f"✅ 选中对象 ({len(s.selected_objects)})", icon="OBJECT_DATA")
+        for obj in s.selected_objects:
+            sub.label(text=f"  {obj.name} ({obj.type})")
+
+    # 文件信息
+    box = layout.box()
+    box.label(text="📁 文件", icon="FILE")
+    box.label(text=f"路径: {p.blend_filepath or '(未保存)'}")
+    box.label(text=f"状态: {'已保存' if p.is_saved else '未保存'}")
+    if p.recent_scripts:
+        box.label(text=f"文本块: {', '.join(p.recent_scripts[:5])}")
+
+    # 事件监控
+    events = state.get_recent_events(limit=20)
+    if events:
+        box = layout.box()
+        box.label(text=f"📡 最近操作 ({len(events)})", icon="INFO")
+        for ev in reversed(events[-10:]):
+            box.label(text=f"  {ev}")
+
+
+# ---------------------------------------------------------------------------
+# Tab: 📜 历史
+# ---------------------------------------------------------------------------
+
+def _draw_history_tab(layout: bpy.types.UILayout, context: bpy.types.Context) -> None:
+    """历史 tab：会话列表（可点击切换）。"""
+    from .ui_history import draw_history_panel
+    draw_history_panel(layout)
+
+
+# ---------------------------------------------------------------------------
+# Tab: ⚙️ 设置
+# ---------------------------------------------------------------------------
+
+def _draw_settings_tab(layout: bpy.types.UILayout, context: bpy.types.Context) -> None:
+    """设置 tab：API、MCP、上下文采集参数。"""
+    from ..preferences import get_prefs
+    prefs = get_prefs(context)
+
+    # API 设置
+    box = layout.box()
+    box.label(text="🔗 API 连接", icon="URL")
+    box.prop(prefs, "api_endpoint", text="端点")
+    box.prop(prefs, "api_key", text="API Key")
+    box.prop(prefs, "model_name", text="模型")
+    row = box.row(align=True)
+    row.prop(prefs, "max_tokens")
+    row.prop(prefs, "temperature")
+    box.prop(prefs, "request_timeout", text="超时 (秒)")
+
+    # MCP 服务器
+    box = layout.box()
+    box.label(text="🔌 MCP 服务器", icon="NETWORK_DRIVE")
+    from ..mcp_server import is_running
+    running = is_running()
+    box.label(text=f"状态: {'🟢 运行中' if running else '🔴 已停止'}")
+    box.prop(prefs, "mcp_enabled", text="启用")
+    row = box.row(align=True)
+    if running:
+        row.operator("aiwork.mcp_stop", text="停止", icon="CANCEL")
+    else:
+        row.operator("aiwork.mcp_start", text="启动", icon="PLAY")
+    row.operator("aiwork.mcp_restart", text="重启", icon="FILE_REFRESH")
+
+    # 上下文采集
+    box = layout.box()
+    box.label(text="📐 上下文采集", icon="SCENE_DATA")
+    box.prop(prefs, "context_max_objects", text="最多对象数")
+    row = box.row(align=True)
+    row.prop(prefs, "context_include_world", text="世界")
+    row.prop(prefs, "context_include_render", text="渲染")
+    box.prop(prefs, "context_refresh_interval", text="自动刷新 (秒)")
+
+    # 会话管理
+    box = layout.box()
+    box.label(text="💬 会话", icon="FILE_TEXT")
+    row = box.row(align=True)
+    row.operator("aiwork.chat_new_session", text="新建", icon="ADD")
+    row.operator("aiwork.chat_clear", text="清空", icon="TRASH")
 
     # -- 上下文摘要 --
     session = state.get_current_session()

@@ -31,7 +31,7 @@ from .settings import (
 
 class AIWorkPreferences(AddonPreferences):
     """AIWork 插件偏好设置。"""
-    bl_idname = __package__  # 会被 Blender 解析为父包名
+    bl_idname = "aiwork"
 
     # ------------------------------------------------------------------
     # API 连接

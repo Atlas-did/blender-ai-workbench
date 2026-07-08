@@ -31,10 +31,18 @@ def draw_history_panel(layout: bpy.types.UILayout) -> None:
         item.alert = is_current
 
         header = item.row(align=True)
-        header.label(text=sess.title or "未命名会话", icon=uc.icon("done") if is_current else uc.icon("chat"))
+        if is_current:
+            header.label(text=sess.title or "未命名会话", icon=uc.icon("done"))
+        else:
+            op = header.operator("aiwork.switch_session", text=sess.title or "未命名会话",
+                                  icon=uc.icon("chat"), emboss=False)
+            op.session_id = sess.id
         header.separator_spacer()
         if is_current:
             header.label(text="当前", icon=uc.icon("confirm"))
+        elif len(sessions) > 1:
+            op_del = header.operator("aiwork.delete_session", text="", icon="X", emboss=False)
+            op_del.session_id = sess.id
 
         uc.draw_status_chip(item, "消息", f"{len(sess.messages)} 条", "chat")
         uc.draw_status_chip(item, "创建", _fmt_time(sess.created_at), "pending")
